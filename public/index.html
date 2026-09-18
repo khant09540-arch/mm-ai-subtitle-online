@@ -3,65 +3,85 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>MM AI Subtitle</title>
+
   <link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
+
   <main class="container">
 
     <section class="hero">
-      <div class="badge">AI SUBTITLE</div>
+
+      <div class="badge">✦ AI SUBTITLE</div>
+
       <h1>MM AI Subtitle</h1>
-      <p>Chinese / English → Myanmar Subtitle</p>
+
+      <p>
+        Chinese / English → Myanmar Subtitle
+      </p>
+
     </section>
+
 
     <section class="card">
 
-      <label class="drop">
-        <input id="media" type="file" accept="video/*,audio/*">
+      <label class="drop" for="media">
 
-        <span class="icon">＋</span>
+        <input
+          id="media"
+          type="file"
+          accept="video/*,audio/*"
+        >
+
+        <div class="upload-icon">＋</div>
 
         <strong id="fileName">
           Video / Audio ဖိုင်ရွေးပါ
         </strong>
 
         <small>
-          MP4, MOV, MKV, MP3, WAV စသည်
+          MP4 • MOV • MKV • MP3 • WAV • M4A
         </small>
+
       </label>
 
+
       <button id="start">
-        AI Subtitle စတင်မယ်
+        🚀 AI Subtitle စတင်မယ်
       </button>
+
 
       <div class="progress">
         <div id="bar"></div>
       </div>
 
-      <p id="status">
+
+      <p id="status" class="status">
         ဖိုင်ရွေးပြီး Start ကိုနှိပ်ပါ။
       </p>
 
     </section>
 
+
     <section id="result" class="card hidden">
 
-      <h2>ရလဒ်</h2>
+      <h2>🎉 ရလဒ်</h2>
 
       <div class="links">
 
         <a id="srt" download>
-          SRT Download
+          📄 SRT Download
         </a>
 
         <a id="vtt" download>
-          VTT Download
+          📄 VTT Download
         </a>
 
         <a id="video" download class="hidden">
-          Subtitle Video Download
+          🎬 Subtitle Video Download
         </a>
 
       </div>
@@ -70,6 +90,8 @@
 
   </main>
 
+
   <script src="/app.js"></script>
+
 </body>
 </html>
