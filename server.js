@@ -1,252 +1,545 @@
-* {
-  box-sizing: border-box;
+import express from "express";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { GoogleGenAI } from "@google/genai";
+
+const app = express();
+
+const PORT = process.env.PORT || 3000;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (!GEMINI_API_KEY) {
+  console.error("ERROR: GEMINI_API_KEY is not configured.");
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  min-height: 100%;
-}
+const ai = new GoogleGenAI({
+  apiKey: GEMINI_API_KEY
+});
 
-body {
-  font-family: Arial, "Noto Sans Myanmar", sans-serif;
-  background: #0b1020;
-  color: #ffffff;
-}
+const root = process.cwd();
 
-.container {
-  width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 20px 16px 50px;
-}
+const uploadDir = path.join(root, "uploads");
+const outputDir = path.join(root, "outputs");
 
-/* HERO */
+fs.mkdirSync(uploadDir, { recursive: true });
+fs.mkdirSync(outputDir, { recursive: true });
 
-.hero {
-  text-align: center;
-  padding: 35px 10px 25px;
-}
+const storage = multer.diskStorage({
+  destination: uploadDir,
 
-.badge {
-  display: inline-block;
-  padding: 8px 14px;
-  border-radius: 30px;
-  background: #27355f;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: bold;
-  letter-spacing: 1px;
-}
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || "";
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  }
+});
 
-.hero h1 {
-  margin: 18px 0 10px;
-  font-size: 42px;
-  line-height: 1.15;
-}
+const upload = multer({
+  storage,
 
-.hero p {
-  margin: 0;
-  color: #b9c2dc;
-  font-size: 17px;
-}
+  limits: {
+    fileSize: 500 * 1024 * 1024
+  }
+});
 
-/* CARD */
+app.use(express.json());
 
-.card {
-  background: #151d34;
-  border: 1px solid #2a3658;
-  border-radius: 20px;
-  padding: 24px;
-  margin-top: 18px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-}
+app.use(
+  express.static(path.join(root, "public"))
+);
 
-/* FILE DROP */
+const jobs = new Map();
 
-.drop {
-  min-height: 220px;
-  border: 2px dashed #4d5d89;
-  border-radius: 16px;
+/* HEALTH CHECK */
 
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "MM AI Subtitle API",
+    gemini: Boolean(GEMINI_API_KEY)
+  });
+});
 
-  gap: 12px;
-  padding: 25px;
-  text-align: center;
+/* CREATE JOB */
 
-  cursor: pointer;
+app.post(
+  "/api/jobs",
+  upload.single("media"),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        error: "No video/audio file uploaded."
+      });
+    }
 
-  transition: 0.2s;
-}
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY is not configured on server."
+      });
+    }
 
-.drop:hover {
-  border-color: #7187ff;
-  background: #1a2440;
-}
+    const id = crypto.randomUUID();
 
-.drop input {
-  display: none;
-}
+    const job = {
+      project_id: id,
+      status: "pending",
+      original_file: req.file.filename,
+      original_name: req.file.originalname,
+      chinese_srt_url: null,
+      final_srt_url: null,
+      final_vtt_url: null,
+      final_video_url: null,
+      error: null
+    };
 
-.icon {
-  font-size: 55px;
-  line-height: 1;
-}
+    jobs.set(id, job);
 
-.drop strong {
-  font-size: 18px;
-}
+    processJob(id).catch((err) => {
+      console.error("JOB ERROR:", err);
 
-.drop small {
-  color: #9ba7c6;
-  font-size: 14px;
-}
+      const j = jobs.get(id);
 
-/* BUTTON */
+      if (j) {
+        j.status = "failed";
+        j.error = err.message;
+      }
+    });
 
-button {
-  display: block;
-  width: 100%;
+    res.json(job);
+  }
+);
 
-  margin-top: 18px;
-  padding: 15px;
+/* GET JOB */
 
-  border: 0;
-  border-radius: 12px;
+app.get(
+  "/api/jobs/:id",
+  (req, res) => {
+    const job = jobs.get(req.params.id);
 
-  background: #536dfe;
-  color: #ffffff;
+    if (!job) {
+      return res.status(404).json({
+        error: "Job not found"
+      });
+    }
 
-  font-size: 17px;
-  font-weight: bold;
+    res.json(job);
+  }
+);
 
-  cursor: pointer;
+/* DOWNLOAD OUTPUT */
 
-  transition: 0.2s;
-}
+app.get(
+  "/outputs/:file",
+  (req, res) => {
+    const safe = path.basename(req.params.file);
+    const filePath = path.join(outputDir, safe);
 
-button:hover {
-  background: #4058e8;
-}
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        error: "File not found"
+      });
+    }
 
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+    res.sendFile(filePath);
+  }
+);
 
-/* PROGRESS */
+/* PROCESS VIDEO */
 
-.progress {
-  width: 100%;
-  height: 9px;
+async function processJob(id) {
+  const job = jobs.get(id);
 
-  background: #293452;
-  border-radius: 10px;
-
-  margin-top: 20px;
-
-  overflow: hidden;
-}
-
-#bar {
-  width: 0%;
-  height: 100%;
-
-  background: #536dfe;
-
-  border-radius: 10px;
-
-  transition: width 0.3s ease;
-}
-
-/* STATUS */
-
-#status {
-  margin-top: 15px;
-  color: #b9c2dc;
-  text-align: center;
-  line-height: 1.6;
-}
-
-/* RESULT */
-
-.hidden {
-  display: none !important;
-}
-
-#result h2 {
-  margin-top: 0;
-  text-align: center;
-}
-
-/* DOWNLOAD LINKS */
-
-.links {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.links a {
-  display: block;
-  width: 100%;
-
-  padding: 15px;
-
-  border-radius: 12px;
-
-  background: #536dfe;
-  color: #ffffff;
-
-  text-align: center;
-  text-decoration: none;
-
-  font-size: 16px;
-  font-weight: bold;
-
-  transition: 0.2s;
-}
-
-.links a:hover {
-  background: #4058e8;
-}
-
-/* MOBILE */
-
-@media (max-width: 600px) {
-
-  .container {
-    padding: 12px 12px 40px;
+  if (!job) {
+    throw new Error("Job not found");
   }
 
-  .hero {
-    padding: 25px 5px 18px;
+  const input = path.join(
+    uploadDir,
+    job.original_file
+  );
+
+  /* STEP 1 */
+
+  job.status = "uploading_to_ai";
+
+  const mimeType = getMimeType(
+    job.original_name
+  );
+
+  console.log("Uploading:", input);
+  console.log("MIME:", mimeType);
+
+  const uploadedFile = await ai.files.upload({
+    file: input,
+    config: {
+      mimeType
+    }
+  });
+
+  console.log(
+    "Gemini file:",
+    uploadedFile.name
+  );
+
+  /* STEP 2 */
+
+  job.status = "processing_video";
+
+  let videoFile = uploadedFile;
+
+  while (
+    videoFile.state &&
+    getStateName(videoFile.state) === "PROCESSING"
+  ) {
+    await sleep(3000);
+
+    videoFile = await ai.files.get({
+      name: videoFile.name
+    });
+
+    console.log(
+      "File state:",
+      getStateName(videoFile.state)
+    );
   }
 
-  .hero h1 {
-    font-size: 32px;
+  const finalState =
+    getStateName(videoFile.state);
+
+  if (
+    finalState &&
+    finalState !== "ACTIVE"
+  ) {
+    throw new Error(
+      `Gemini file processing failed: ${finalState}`
+    );
   }
 
-  .hero p {
-    font-size: 15px;
+  /* STEP 3 */
+
+  job.status = "transcribing";
+
+  const prompt = `
+You are a professional subtitle translator.
+
+Analyze the uploaded video carefully.
+
+The spoken language may be Chinese or English.
+
+Listen to the actual speech in the video.
+
+Create accurate subtitle segments based on the speech.
+
+Translate the spoken dialogue into natural Myanmar (Burmese).
+
+Important rules:
+
+1. Do NOT invent dialogue.
+2. Do NOT summarize.
+3. Keep the original meaning.
+4. Preserve the order of speech.
+5. Create accurate start and end timestamps.
+6. Split long dialogue into readable subtitle segments.
+7. Each subtitle should normally be around 1-2 short sentences.
+8. Return ONLY JSON.
+9. No markdown.
+10. No explanation.
+
+JSON format:
+
+[
+  {
+    "start": 0,
+    "end": 3,
+    "text": "မြန်မာဘာသာပြန်စာ"
+  }
+]
+
+start and end must be seconds as numbers.
+`;
+
+  const response =
+    await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+
+      contents: [
+        {
+          role: "user",
+
+          parts: [
+            {
+              fileData: {
+                fileUri: videoFile.uri,
+                mimeType: videoFile.mimeType
+              }
+            },
+
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+
+      config: {
+        responseMimeType: "application/json",
+
+        responseSchema: {
+          type: "array",
+
+          items: {
+            type: "object",
+
+            properties: {
+              start: {
+                type: "number"
+              },
+
+              end: {
+                type: "number"
+              },
+
+              text: {
+                type: "string"
+              }
+            },
+
+            required: [
+              "start",
+              "end",
+              "text"
+            ]
+          }
+        }
+      }
+    });
+
+  /* STEP 4 */
+
+  job.status = "creating_subtitles";
+
+  const aiText = response.text;
+
+  console.log(
+    "Gemini response:",
+    aiText
+  );
+
+  let subtitles;
+
+  try {
+    subtitles =
+      JSON.parse(aiText);
+  } catch (error) {
+    throw new Error(
+      "Gemini returned invalid subtitle JSON."
+    );
   }
 
-  .card {
-    padding: 18px;
-    border-radius: 16px;
+  if (!Array.isArray(subtitles)) {
+    throw new Error(
+      "Invalid subtitle data."
+    );
   }
 
-  .drop {
-    min-height: 190px;
+  subtitles =
+    subtitles
+      .map((item) => ({
+        start:
+          Number(item.start),
+
+        end:
+          Number(item.end),
+
+        text:
+          String(item.text || "").trim()
+      }))
+
+      .filter(
+        (item) =>
+          Number.isFinite(item.start) &&
+          Number.isFinite(item.end) &&
+          item.end > item.start &&
+          item.text
+      );
+
+  if (subtitles.length === 0) {
+    throw new Error(
+      "No subtitles were generated."
+    );
   }
 
-  .icon {
-    font-size: 45px;
-  }
+  /* STEP 5 */
 
+  const srt =
+    makeSrt(subtitles);
+
+  const vtt =
+    makeVtt(subtitles);
+
+  const srtName =
+    `${id}.srt`;
+
+  const vttName =
+    `${id}.vtt`;
+
+  fs.writeFileSync(
+    path.join(outputDir, srtName),
+    srt,
+    "utf8"
+  );
+
+  fs.writeFileSync(
+    path.join(outputDir, vttName),
+    vtt,
+    "utf8"
+  );
+
+  job.final_srt_url =
+    `/outputs/${srtName}`;
+
+  job.final_vtt_url =
+    `/outputs/${vttName}`;
+
+  job.chinese_srt_url =
+    `/outputs/${srtName}`;
+
+  job.status = "completed";
+
+  console.log(
+    "JOB COMPLETED:",
+    id
+  );
 }
+
+/* MIME TYPE */
+
+function getMimeType(filename) {
+  const ext =
+    path.extname(filename)
+      .toLowerCase();
+
+  const types = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+    ".avi": "video/x-msvideo",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac"
+  };
+
+  return (
+    types[ext] ||
+    "application/octet-stream"
+  );
+}
+
+/* STATE */
+
+function getStateName(state) {
+  if (!state) {
+    return "";
+  }
+
+  if (typeof state === "string") {
+    return state;
+  }
+
+  if (state.name) {
+    return state.name;
+  }
+
+  return String(state);
+}
+
+/* SRT */
+
+function makeSrt(items) {
+  return items
+    .map((x, i) => {
+      return `${i + 1}
+${toSrtTime(x.start)} --> ${toSrtTime(x.end)}
+${x.text}
+`;
+    })
+    .join("\n");
+}
+
+/* VTT */
+
+function makeVtt(items) {
+  return (
+    "WEBVTT\n\n" +
+    items
+      .map((x) => {
+        return `${toVttTime(x.start)} --> ${toVttTime(x.end)}
+${x.text}
+`;
+      })
+      .join("\n")
+  );
+}
+
+/* TIME */
+
+function toSrtTime(sec) {
+  sec = Math.max(
+    0,
+    Number(sec) || 0
+  );
+
+  const ms =
+    Math.round(
+      (sec % 1) * 1000
+    );
+
+  const total =
+    Math.floor(sec);
+
+  const s =
+    total % 60;
+
+  const m =
+    Math.floor(total / 60) % 60;
+
+  const h =
+    Math.floor(total / 3600);
+
+  return `${pad(h)}:${pad(m)}:${pad(s)},${String(ms).padStart(3, "0")}`;
+}
+
+function toVttTime(sec) {
+  return toSrtTime(sec)
+    .replace(",", ".");
+}
+
+function pad(n) {
+  return String(n)
+    .padStart(2, "0");
+}
+
+/* SLEEP */
+
+function sleep(ms) {
+  return new Promise(
+    (resolve) =>
+      setTimeout(resolve, ms)
+  );
+}
+
+/* START SERVER */
+
+app.listen(
+  PORT,
+  () => {
+    console.log(
+      `MM AI Subtitle running on port ${PORT}`
+    );
+  }
+);
