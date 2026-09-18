@@ -2,120 +2,322 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0b1020;
+  min-height: 100vh;
+
+  font-family:
+    Arial,
+    "Noto Sans Myanmar",
+    sans-serif;
+
+  background:
+    radial-gradient(
+      circle at top,
+      #24345f 0%,
+      #0b1020 45%,
+      #070b16 100%
+    );
+
   color: #ffffff;
 }
 
+
 .container {
+  width: 100%;
   max-width: 760px;
-  margin: auto;
-  padding: 28px 16px;
+
+  margin: 0 auto;
+  padding: 24px 16px 50px;
 }
+
+
+/* HERO */
 
 .hero {
   text-align: center;
-  padding: 35px 10px;
+  padding: 35px 10px 25px;
 }
 
 .badge {
   display: inline-block;
-  padding: 7px 12px;
-  border-radius: 20px;
-  background: #27355f;
+
+  padding: 8px 15px;
+
+  border: 1px solid #526aa5;
+  border-radius: 30px;
+
+  background: rgba(70, 90, 150, 0.35);
+
+  color: #dbe4ff;
+
   font-size: 12px;
-  letter-spacing: 1px;
+  font-weight: bold;
+
+  letter-spacing: 1.5px;
 }
 
 .hero h1 {
-  font-size: 42px;
-  margin: 16px 0 8px;
+  margin: 18px 0 10px;
+
+  font-size: clamp(34px, 9vw, 52px);
+  line-height: 1.1;
 }
 
 .hero p {
+  margin: 0;
+
   color: #b9c2dc;
+
+  font-size: 17px;
 }
 
+
+/* CARD */
+
 .card {
-  background: #151d34;
+  margin-top: 18px;
+
+  padding: 22px;
+
+  background: rgba(21, 29, 52, 0.92);
+
   border: 1px solid #2a3658;
   border-radius: 20px;
-  padding: 24px;
-  margin-top: 18px;
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.25);
 }
+
+
+/* UPLOAD */
 
 .drop {
   min-height: 220px;
-  border: 2px dashed #4d5d89;
-  border-radius: 16px;
+
+  padding: 25px;
+
+  border: 2px dashed #536a9d;
+  border-radius: 17px;
 
   display: flex;
+
   flex-direction: column;
+
   align-items: center;
   justify-content: center;
 
-  gap: 10px;
+  gap: 12px;
+
   text-align: center;
+
   cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.drop:hover {
+  border-color: #8ca4ff;
+
+  background: rgba(83, 109, 254, 0.08);
 }
 
 .drop input {
   display: none;
 }
 
-.icon {
-  font-size: 50px;
+.upload-icon {
+  width: 70px;
+  height: 70px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #26345c;
+
+  color: #91a5ff;
+
+  font-size: 42px;
+}
+
+.drop strong {
+  font-size: 18px;
 }
 
 .drop small {
   color: #9ba7c6;
+
+  font-size: 13px;
 }
 
-button,
-.links a {
-  display: block;
+
+/* BUTTON */
+
+button {
   width: 100%;
+
   margin-top: 18px;
-  padding: 15px;
+
+  padding: 16px;
 
   border: 0;
+  border-radius: 13px;
+
+  background: #536dfe;
+
+  color: #ffffff;
+
+  font-size: 17px;
+  font-weight: bold;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+button:hover {
+  background: #657dff;
+
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.55;
+
+  cursor: not-allowed;
+
+  transform: none;
+}
+
+
+/* PROGRESS */
+
+.progress {
+  width: 100%;
+  height: 9px;
+
+  margin-top: 20px;
+
+  overflow: hidden;
+
+  border-radius: 20px;
+
+  background: #293452;
+}
+
+#bar {
+  width: 0%;
+  height: 100%;
+
+  border-radius: 20px;
+
+  background: #6d83ff;
+
+  transition: width 0.3s ease;
+}
+
+
+/* STATUS */
+
+.status {
+  margin: 16px 0 0;
+
+  color: #b9c2dc;
+
+  text-align: center;
+
+  line-height: 1.6;
+}
+
+
+/* RESULT */
+
+#result h2 {
+  margin-top: 0;
+
+  text-align: center;
+}
+
+
+/* DOWNLOAD LINKS */
+
+.links {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 12px;
+}
+
+.links a {
+  display: block;
+
+  width: 100%;
+
+  padding: 15px;
+
   border-radius: 12px;
 
   background: #536dfe;
+
   color: #ffffff;
 
   text-align: center;
+
   text-decoration: none;
+
   font-size: 16px;
-  cursor: pointer;
+  font-weight: bold;
+
+  transition: 0.2s;
 }
 
-.progress {
-  height: 8px;
-  background: #293452;
-  border-radius: 10px;
-  margin-top: 20px;
-  overflow: hidden;
+.links a:hover {
+  background: #657dff;
 }
 
-.progress div {
-  height: 100%;
-  width: 0;
-  background: #7f93ff;
-  transition: 0.3s;
-}
+
+/* HIDDEN */
 
 .hidden {
   display: none !important;
 }
 
-.links a {
-  background: #263556;
-}
 
-.links a:hover,
-button:hover {
-  filter: brightness(1.15);
+/* MOBILE */
+
+@media (max-width: 500px) {
+
+  .container {
+    padding: 15px 12px 40px;
+  }
+
+  .hero {
+    padding: 25px 5px 18px;
+  }
+
+  .hero h1 {
+    font-size: 36px;
+  }
+
+  .hero p {
+    font-size: 15px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .drop {
+    min-height: 190px;
+  }
+
 }
